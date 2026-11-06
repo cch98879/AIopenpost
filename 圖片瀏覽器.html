@@ -1,0 +1,592 @@
+
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub 圖片瀏覽器</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: "Noto Sans TC", Arial, sans-serif;
+    background: #f4f6fa;
+    color: #263445;
+}
+
+header {
+    background: #182538;
+    color: white;
+    padding: 25px 20px;
+    text-align: center;
+}
+
+header h1 { margin: 0 0 8px; font-size: 26px; }
+header p { margin: 0; color: #cbd5e1; }
+
+.container {
+    max-width: 1400px;
+    margin: auto;
+    padding: 22px;
+}
+
+.settings {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 3px 12px #0000000c;
+    margin-bottom: 20px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+.field label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 6px;
+    font-size: 14px;
+}
+
+input {
+    width: 100%;
+    padding: 11px;
+    border: 1px solid #ccd3dd;
+    border-radius: 7px;
+    font-size: 15px;
+}
+
+button {
+    border: 0;
+    border-radius: 7px;
+    padding: 11px 18px;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: bold;
+}
+
+.load-btn {
+    background: #2563eb;
+    color: white;
+    margin-top: 18px;
+}
+
+.load-btn:hover { background: #1d4ed8; }
+
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+}
+
+#search {
+    max-width: 320px;
+    background: white;
+}
+
+#status {
+    color: #64748b;
+    font-size: 14px;
+    margin-top: 12px;
+    white-space: pre-wrap;
+}
+
+.gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+}
+
+.photo {
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 9px #00000010;
+    transition: .2s;
+}
+
+.photo:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 16px #00000020;
+}
+
+.thumb {
+    width: 100%;
+    height: 175px;
+    object-fit: contain;
+    background: #edf0f4;
+    cursor: zoom-in;
+    display: block;
+}
+
+.photo-info {
+    padding: 10px;
+}
+
+.filename {
+    font-size: 13px;
+    overflow-wrap: anywhere;
+    min-height: 35px;
+    margin-bottom: 8px;
+}
+
+.download-btn {
+    width: 100%;
+    background: #0f9d72;
+    color: white;
+}
+
+.download-btn:hover { background: #087c59; }
+
+.empty {
+    text-align: center;
+    padding: 60px 15px;
+    color: #64748b;
+    grid-column: 1 / -1;
+}
+
+/* 放大圖片視窗 */
+.lightbox {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.93);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+    padding: 65px 20px 80px;
+}
+
+.lightbox.show { display: flex; }
+
+.lightbox img {
+    max-width: 95%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.close {
+    position: absolute;
+    top: 15px;
+    right: 25px;
+    color: white;
+    font-size: 40px;
+    cursor: pointer;
+    background: none;
+}
+
+.prev, .next {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #ffffff30;
+    color: white;
+    font-size: 27px;
+    padding: 12px 18px;
+}
+
+.prev { left: 15px; }
+.next { right: 15px; }
+
+.lightbox-bottom {
+    position: absolute;
+    bottom: 15px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.lightbox-bottom span { color: white; }
+
+.lightbox-bottom button {
+    background: #0f9d72;
+    color: white;
+}
+
+@media(max-width: 800px) {
+    .form-grid { grid-template-columns: repeat(2, 1fr); }
+    .gallery { grid-template-columns: repeat(2, 1fr); }
+    .thumb { height: 145px; }
+}
+
+@media(max-width: 450px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .gallery { grid-template-columns: repeat(2, 1fr); }
+    .container { padding: 12px; }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>🖼️ GitHub 圖片瀏覽器</h1>
+    <p>直接瀏覽 GitHub 儲存庫內的所有圖片</p>
+</header>
+
+<div class="container">
+
+    <section class="settings">
+        <div class="form-grid">
+
+            <div class="field">
+                <label>GitHub 帳號</label>
+                <input id="owner" value="cch98879">
+            </div>
+
+            <div class="field">
+                <label>Repository 儲存庫</label>
+                <input id="repo" value="AI">
+            </div>
+
+            <div class="field">
+                <label>Branch 分支</label>
+                <input id="branch" value="main">
+            </div>
+
+            <div class="field">
+                <label>指定資料夾（可留空）</label>
+                <input id="folder" placeholder="例如：images/2026">
+            </div>
+
+        </div>
+
+        <button class="load-btn" onclick="loadImages()">
+            🔄 讀取 GitHub 圖片
+        </button>
+
+        <div id="status">請按「讀取 GitHub 圖片」開始載入。</div>
+    </section>
+
+    <div class="toolbar">
+        <strong id="count">圖片數量：0 張</strong>
+        <input id="search" placeholder="🔍 搜尋圖片名稱..." oninput="filterImages()">
+    </div>
+
+    <div class="gallery" id="gallery">
+        <div class="empty">等待載入圖片...</div>
+    </div>
+
+</div>
+
+<!-- 圖片放大視窗 -->
+<div class="lightbox" id="lightbox" onclick="backgroundClose(event)">
+
+    <button class="close" onclick="closeLightbox()">×</button>
+
+    <button class="prev" onclick="changeImage(-1,event)">❮</button>
+
+    <img id="largeImage" alt="放大圖片">
+
+    <button class="next" onclick="changeImage(1,event)">❯</button>
+
+    <div class="lightbox-bottom" onclick="event.stopPropagation()">
+        <span id="imageNumber"></span>
+        <button onclick="downloadCurrent()">⬇ 下載圖片</button>
+    </div>
+
+</div>
+
+<script>
+let allImages = [];
+let visibleImages = [];
+let currentIndex = 0;
+
+// 支援的圖片格式
+const imageExtensions = [
+    "jpg", "jpeg", "png", "gif",
+    "webp", "bmp", "svg", "ico",
+    "avif", "tif", "tiff"
+];
+
+// 讀取 GitHub 圖片
+async function loadImages() {
+
+    const owner = document.getElementById("owner").value.trim();
+    const repo = document.getElementById("repo").value.trim();
+    const branchInput = document.getElementById("branch").value.trim();
+    const folder = document.getElementById("folder").value
+                        .trim().replace(/^\/+|\/+$/g, "");
+
+    const status = document.getElementById("status");
+    const gallery = document.getElementById("gallery");
+
+    if (!owner || !repo) {
+        alert("請輸入 GitHub 帳號及 Repository！");
+        return;
+    }
+
+    status.textContent = "正在連接 GitHub，請稍候...";
+    gallery.innerHTML = "";
+    allImages = [];
+    visibleImages = [];
+    document.getElementById("count").textContent = "圖片數量：0 張";
+
+    try {
+
+        // 取得預設分支
+        const repoUrl =
+            `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+
+        const repoResponse = await fetch(repoUrl);
+
+        if (!repoResponse.ok) {
+            throw new Error("無法讀取 Repository，請確認帳號、儲存庫是否存在，以及是否為公開儲存庫。");
+        }
+
+        const repoData = await repoResponse.json();
+
+        const branch = branchInput || repoData.default_branch;
+
+        // 取得整個 Repository 的檔案樹
+        const treeUrl =
+            `${repoUrl}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
+
+        const treeResponse = await fetch(treeUrl);
+
+        if (!treeResponse.ok) {
+            throw new Error("讀取資料夾失敗，請檢查 Branch 分支名稱。");
+        }
+
+        const treeData = await treeResponse.json();
+
+        if (treeData.truncated) {
+            status.textContent =
+                "注意：GitHub 回傳的檔案清單過大，可能未包含全部檔案。";
+        }
+
+        // 篩選指定資料夾內的圖片
+        const files = treeData.tree.filter(file => {
+
+            if (file.type !== "blob") return false;
+
+            const path = file.path;
+
+            if (folder) {
+                if (!path.startsWith(folder + "/")) return false;
+
+                // 只讀取指定資料夾內的檔案，不包含更深層子資料夾
+                const relativePath = path.substring(folder.length + 1);
+
+                if (relativePath.includes("/")) return false;
+            }
+
+            const ext = path.split(".").pop().toLowerCase();
+
+            return imageExtensions.includes(ext);
+        });
+
+        if (files.length === 0) {
+            gallery.innerHTML =
+                '<div class="empty">找不到圖片，請確認資料夾路徑及圖片格式。</div>';
+
+            status.textContent = "讀取完成，沒有找到符合條件的圖片。";
+            return;
+        }
+
+        allImages = files.map(file => ({
+            name: file.path.split("/").pop(),
+            path: file.path,
+            url: `https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(branch)}/${file.path.split("/").map(encodeURIComponent).join("/")}`
+        }));
+
+        visibleImages = [...allImages];
+
+        renderImages();
+
+        status.textContent =
+            `讀取完成！共找到 ${allImages.length} 張圖片。` +
+            (treeData.truncated ? " 注意：檔案清單可能不完整。" : "");
+
+    } catch (error) {
+
+        status.textContent = "讀取錯誤：" + error.message;
+
+        gallery.innerHTML =
+            '<div class="empty">無法載入圖片，請檢查網路及 GitHub 設定。</div>';
+
+    }
+}
+
+// 顯示縮圖
+function renderImages() {
+
+    const gallery = document.getElementById("gallery");
+
+    document.getElementById("count").textContent =
+        `圖片數量：${visibleImages.length} 張（共 ${allImages.length} 張）`;
+
+    if (visibleImages.length === 0) {
+        gallery.innerHTML =
+            '<div class="empty">沒有符合搜尋條件的圖片。</div>';
+        return;
+    }
+
+    gallery.innerHTML = "";
+
+    visibleImages.forEach((img, index) => {
+
+        const card = document.createElement("div");
+        card.className = "photo";
+
+        const thumbnail = document.createElement("img");
+        thumbnail.className = "thumb";
+        thumbnail.src = img.url;
+        thumbnail.alt = img.name;
+        thumbnail.loading = "lazy";
+        thumbnail.onclick = () => openLightbox(index);
+
+        thumbnail.onerror = () => {
+            thumbnail.alt = "圖片載入失敗";
+            thumbnail.style.opacity = "0.3";
+        };
+
+        const info = document.createElement("div");
+        info.className = "photo-info";
+
+        const filename = document.createElement("div");
+        filename.className = "filename";
+        filename.textContent = img.name;
+
+        const download = document.createElement("button");
+        download.className = "download-btn";
+        download.textContent = "⬇ 下載圖片";
+        download.onclick = () => downloadImage(img);
+
+        info.appendChild(filename);
+        info.appendChild(download);
+
+        card.appendChild(thumbnail);
+        card.appendChild(info);
+
+        gallery.appendChild(card);
+    });
+}
+
+// 搜尋圖片
+function filterImages() {
+
+    const keyword = document.getElementById("search")
+                            .value.trim().toLowerCase();
+
+    visibleImages = allImages.filter(img =>
+        img.name.toLowerCase().includes(keyword)
+    );
+
+    renderImages();
+}
+
+// 放大圖片
+function openLightbox(index) {
+
+    currentIndex = index;
+
+    document.getElementById("lightbox").classList.add("show");
+
+    updateLightbox();
+}
+
+function updateLightbox() {
+
+    const img = visibleImages[currentIndex];
+
+    if (!img) return;
+
+    document.getElementById("largeImage").src = img.url;
+
+    document.getElementById("imageNumber").textContent =
+        `${currentIndex + 1} / ${visibleImages.length}　${img.name}`;
+}
+
+// 上一張 / 下一張
+function changeImage(step, event) {
+
+    event.stopPropagation();
+
+    if (visibleImages.length === 0) return;
+
+    currentIndex =
+        (currentIndex + step + visibleImages.length) % visibleImages.length;
+
+    updateLightbox();
+}
+
+// 關閉圖片
+function closeLightbox() {
+    document.getElementById("lightbox").classList.remove("show");
+}
+
+function backgroundClose(event) {
+    if (event.target.id === "lightbox") closeLightbox();
+}
+
+// 鍵盤操作
+document.addEventListener("keydown", event => {
+
+    const box = document.getElementById("lightbox");
+
+    if (!box.classList.contains("show")) return;
+
+    if (event.key === "Escape") closeLightbox();
+    if (event.key === "ArrowLeft") changeImage(-1, event);
+    if (event.key === "ArrowRight") changeImage(1, event);
+});
+
+// 下載圖片
+async function downloadImage(img) {
+
+    const status = document.getElementById("status");
+
+    try {
+
+        status.textContent = "正在準備下載：" + img.name;
+
+        const response = await fetch(img.url);
+
+        if (!response.ok) throw new Error("下載失敗");
+
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = objectUrl;
+        a.download = img.name;
+
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
+
+        status.textContent = "下載完成：" + img.name;
+
+    } catch (error) {
+
+        // 跨來源下載受限時，改為開啟原始圖檔
+        status.textContent =
+            "瀏覽器無法直接下載，已改為開啟原始圖片，請另存圖片。";
+
+        window.open(img.url, "_blank");
+
+    }
+}
+
+// 下載放大視窗中的圖片
+function downloadCurrent() {
+
+    if (visibleImages[currentIndex]) {
+        downloadImage(visibleImages[currentIndex]);
+    }
+}
+</script>
+
+</body>
+</html>
