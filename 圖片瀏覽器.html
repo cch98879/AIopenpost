@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://images.weserv.nl">
+<link rel="preconnect" href="https://raw.githubusercontent.com">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
 <title>李信賢的AI素材中心</title>
 
 <style>
@@ -454,12 +457,23 @@ function getImageUrls(path) {
     const encodedPath = encodePath(path);
     const encodedBranch = encodeURIComponent(BRANCH);
 
-    return {
-        raw:
-            `https://cch98879.github.io/AIopenpost/${OWNER}/${REPO}/${encodedBranch}/${encodedPath}`,
+    // GitHub 原始圖片網址：供放大及下載使用
+    const raw =
+        `https://cch98879.github.io/AIopenpost/${OWNER}/${REPO}/${encodedBranch}/${encodedPath}`;
 
-        cdn:
-            `https://cdn.jsdelivr.net/gh/${OWNER}/${REPO}@${BRANCH}/${encodedPath}`
+    // jsDelivr 備援網址
+    const cdn =
+        `https://cdn.jsdelivr.net/gh/${OWNER}/${REPO}@${BRANCH}/${encodedPath}`;
+
+    // 使用圖片轉換服務產生較小的 WebP 縮圖
+    // 240x240 已足夠目前 175px 左右的縮圖顯示
+    const thumbnail =
+        `https://images.weserv.nl/?url=${encodeURIComponent(raw)}&w=240&h=240&fit=contain&output=webp&q=65`;
+
+    return {
+        raw: raw,
+        cdn: cdn,
+        thumbnail: thumbnail
     };
 
 }
@@ -544,7 +558,8 @@ async function loadImages() {
                     ? parts[0]
                     : "根目錄",
                 url: urls.raw,
-                backupUrl: urls.cdn
+                backupUrl: urls.cdn,
+                thumbnail: urls.thumbnail
             };
 
         });
@@ -734,15 +749,26 @@ function renderImages() {
 
         thumbnail.className = "thumb";
         thumbnail.alt = img.name;
+        thumbnail.width = 240;
+        thumbnail.height = 240;
         thumbnail.loading = "lazy";
-        thumbnail.src = img.url;
+        thumbnail.decoding = "async";
+        thumbnail.fetchPriority = "low";
 
-        // Raw 失敗改用 CDN
+        // 先載入小尺寸 WebP，降低每張預覽圖的下載量
+        thumbnail.src = img.thumbnail;
+
+        // 縮圖服務失敗時，依序退回 GitHub 原圖及 jsDelivr
         thumbnail.onerror = function() {
 
             if (this.dataset.fallback !== "1") {
 
                 this.dataset.fallback = "1";
+                this.src = img.url;
+
+            } else if (this.dataset.fallback !== "2") {
+
+                this.dataset.fallback = "2";
                 this.src = img.backupUrl;
 
             } else {
@@ -776,9 +802,12 @@ function renderImages() {
 
         const download = document.createElement("button");
         download.className = "download-btn";
-        download.textContent = "⬇ 下載圖片";
+        download.textContent = "⬇ 下載原始圖片";
 
-        download.onclick = () => downloadImage(img);
+        download.onclick = (event) => {
+            event.stopPropagation();
+            downloadImage(img);
+        };
 
         info.appendChild(filename);
         info.appendChild(folder);
@@ -918,7 +947,7 @@ async function downloadImage(img) {
 
     const status = document.getElementById("status");
 
-    status.textContent = "正在下載：" + img.name;
+    status.textContent = "正在下載原始圖片：" + img.name;
 
     try {
 
@@ -949,7 +978,7 @@ async function downloadImage(img) {
             URL.revokeObjectURL(objectUrl);
         }, 30000);
 
-        status.textContent = "下載完成：" + img.name;
+        status.textContent = "原始圖片下載完成：" + img.name;
 
     } catch (error) {
 
